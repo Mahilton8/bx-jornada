@@ -1,0 +1,448 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BX Jornada — Painel Administrativo</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js"></script>
+<style>
+  :root{
+    --navy-deep:#03070F; --navy:#0B1225; --teal:#00E5C8; --green:#39FF7E;
+    --gold:#FFD166; --red:#FF4D6D; --text:#E9EDF5; --text-dim:#8B93A7;
+    --card:#0F1830; --card-border:#1C2848;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0; background:var(--navy-deep); color:var(--text); font-family:'Segoe UI',system-ui,-apple-system,sans-serif;}
+
+  .app{display:grid; grid-template-columns:220px 1fr; min-height:100vh;}
+  @media (max-width:860px){ .app{grid-template-columns:1fr;} .sidebar{position:sticky; top:0; z-index:30; display:flex; flex-direction:row; overflow-x:auto;} }
+
+  .sidebar{background:var(--navy); border-right:1px solid var(--card-border); padding:20px 14px; display:flex; flex-direction:column; gap:4px;}
+  .sidebar .brand{font-size:10px; letter-spacing:3px; color:var(--text-dim); text-transform:uppercase; padding:0 8px 4px;}
+  .sidebar .title{font-size:17px; font-weight:800; padding:0 8px 18px; border-bottom:1px solid var(--card-border); margin-bottom:12px;}
+  .sidebar .title span{color:var(--teal);}
+  .nav-item{padding:11px 12px; border-radius:10px; cursor:pointer; font-size:13.5px; font-weight:600; color:var(--text-dim); white-space:nowrap;}
+  .nav-item:hover{background:rgba(255,255,255,.04); color:var(--text);}
+  .nav-item.active{background:linear-gradient(135deg, rgba(0,229,200,.16), rgba(0,229,200,.04)); color:var(--teal); border:1px solid rgba(0,229,200,.3);}
+
+  main{padding:26px 30px 60px; max-width:1200px;}
+  .page{display:none;} .page.active{display:block;}
+  .page-header{display:flex; justify-content:space-between; align-items:flex-end; margin-bottom:22px; flex-wrap:wrap; gap:12px;}
+  .page-header h2{margin:0; font-size:22px; font-weight:800;}
+  .page-header p{margin:4px 0 0; color:var(--text-dim); font-size:13px;}
+
+  .btn{padding:11px 18px; border-radius:10px; border:none; font-weight:700; font-size:13.5px; cursor:pointer;}
+  .btn-teal{background:linear-gradient(135deg, var(--teal), #00B8A3); color:var(--navy-deep);}
+  .btn-ghost{background:transparent; border:1px solid var(--card-border); color:var(--text);}
+  .btn-danger{background:rgba(255,77,109,.14); color:var(--red); border:1px solid rgba(255,77,109,.3);}
+  .btn-sm{padding:6px 10px; font-size:12px; border-radius:8px;}
+
+  /* KPI cards */
+  .kpis{display:grid; grid-template-columns:repeat(auto-fit,minmax(190px,1fr)); gap:14px; margin-bottom:24px;}
+  .kpi{background:var(--card); border:1px solid var(--card-border); border-radius:14px; padding:16px 18px; border-top:3px solid var(--teal);}
+  .kpi.gold{border-top-color:var(--gold);} .kpi.green{border-top-color:var(--green);} .kpi.red{border-top-color:var(--red);}
+  .kpi .label{font-size:11px; letter-spacing:1.5px; text-transform:uppercase; color:var(--text-dim);}
+  .kpi .valor{font-size:26px; font-weight:800; margin-top:6px;}
+  .kpi .sub{font-size:12px; color:var(--text-dim); margin-top:2px;}
+
+  .charts-row{display:grid; grid-template-columns:1.3fr 1fr; gap:16px; margin-bottom:24px;}
+  @media (max-width:860px){ .charts-row{grid-template-columns:1fr;} }
+  .card{background:var(--card); border:1px solid var(--card-border); border-radius:16px; padding:18px;}
+  .card h3{margin:0 0 14px; font-size:14px; font-weight:700; color:var(--text-dim); text-transform:uppercase; letter-spacing:1px;}
+
+  table{width:100%; border-collapse:collapse; font-size:13px;}
+  th{text-align:left; padding:10px 12px; color:var(--text-dim); font-weight:600; font-size:11.5px; text-transform:uppercase; letter-spacing:.5px; border-bottom:1px solid var(--card-border);}
+  td{padding:11px 12px; border-bottom:1px solid rgba(255,255,255,.04);}
+  tr:hover td{background:rgba(255,255,255,.02);}
+  .tag{padding:3px 9px; border-radius:20px; font-size:11px; font-weight:700;}
+  .tag.mov{background:rgba(57,255,126,.14); color:var(--green);}
+  .tag.parado{background:rgba(255,209,102,.14); color:var(--gold);}
+  .tag.descanso{background:rgba(0,229,200,.14); color:var(--teal);}
+  .tag.ativo{background:rgba(57,255,126,.14); color:var(--green);}
+  .tag.inativo{background:rgba(255,77,109,.14); color:var(--red);}
+
+  .form-grid{display:grid; grid-template-columns:1fr 1fr; gap:14px;}
+  @media (max-width:600px){ .form-grid{grid-template-columns:1fr;} }
+  .form-grid label{display:block; font-size:12px; color:var(--text-dim); margin-bottom:6px; font-weight:600;}
+  .form-grid input, .form-grid select{width:100%; padding:11px 12px; border-radius:9px; border:1px solid var(--card-border); background:var(--navy); color:var(--text); font-size:14px;}
+  .form-grid input:focus, .form-grid select:focus{outline:none; border-color:var(--teal);}
+
+  .overlay{position:fixed; inset:0; background:rgba(3,7,15,.8); display:none; align-items:flex-start; justify-content:center; z-index:50; padding:40px 20px; overflow-y:auto;}
+  .overlay.show{display:flex;}
+  .modal{background:var(--navy); border:1px solid var(--card-border); border-radius:18px; padding:24px; max-width:520px; width:100%;}
+  .modal h3{margin:0 0 18px;}
+  .modal .acoes{display:flex; gap:10px; margin-top:18px; justify-content:flex-end;}
+
+  .toolbar{display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; flex-wrap:wrap; gap:10px;}
+  .empty{color:var(--text-dim); text-align:center; padding:30px; font-size:13px;}
+  .toast{position:fixed; left:50%; bottom:24px; transform:translateX(-50%) translateY(20px); opacity:0;
+    background:var(--green); color:var(--navy-deep); font-weight:800; padding:14px 22px; border-radius:12px; transition:.25s; z-index:60;}
+  .toast.show{opacity:1; transform:translateX(-50%) translateY(0);}
+  .toast.erro{background:var(--red); color:#fff;}
+</style>
+</head>
+<body>
+
+<div class="app">
+  <aside class="sidebar">
+    <div>
+      <div class="brand">TRANSPORTADORA</div>
+      <div class="title">BX <span>Jornada</span></div>
+    </div>
+    <div class="nav-item active" onclick="irPagina('dashboard')">📊 Painel Executivo</div>
+    <div class="nav-item" onclick="irPagina('motoristas')">🧑‍✈️ Motoristas</div>
+    <div class="nav-item" onclick="irPagina('veiculos')">🚛 Veículos</div>
+    <div class="nav-item" onclick="irPagina('apontamentos')">📋 Apontamentos</div>
+  </aside>
+
+  <main>
+    <!-- DASHBOARD -->
+    <div class="page active" id="page-dashboard">
+      <div class="page-header">
+        <div>
+          <h2>Painel Executivo de Jornada</h2>
+          <p>Consolidado de tempo em movimento, parado e descanso — últimos 7 dias</p>
+        </div>
+        <button class="btn btn-ghost" onclick="carregarDashboard()">↻ Atualizar</button>
+      </div>
+
+      <div class="kpis">
+        <div class="kpi green"><div class="label">Tempo em movimento</div><div class="valor" id="kpi-movimento">—</div><div class="sub">soma de todos os motoristas</div></div>
+        <div class="kpi gold"><div class="label">Tempo parado</div><div class="valor" id="kpi-parado">—</div><div class="sub">manutenção, carga, descarga, espera</div></div>
+        <div class="kpi"><div class="label">Tempo de descanso</div><div class="valor" id="kpi-descanso">—</div><div class="sub">refeição + descanso</div></div>
+        <div class="kpi"><div class="label">Motoristas ativos</div><div class="valor" id="kpi-motoristas">—</div><div class="sub" id="kpi-apontamentos-sub">— apontamentos no período</div></div>
+      </div>
+
+      <div class="charts-row">
+        <div class="card">
+          <h3>Movimento x Parado x Descanso por motorista</h3>
+          <canvas id="chartMotoristas" height="220"></canvas>
+        </div>
+        <div class="card">
+          <h3>Distribuição geral do tempo</h3>
+          <canvas id="chartPizza" height="220"></canvas>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>Ranking de tempo parado por motorista</h3>
+        <table>
+          <thead><tr><th>Motorista</th><th>Movimento</th><th>Parado</th><th>Descanso</th><th>Última atividade</th></tr></thead>
+          <tbody id="tabela-ranking"><tr><td colspan="5" class="empty">Carregando...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- MOTORISTAS -->
+    <div class="page" id="page-motoristas">
+      <div class="page-header">
+        <div><h2>Motoristas</h2><p>Cadastro e vínculo de motoristas com veículos</p></div>
+        <button class="btn btn-teal" onclick="abrirModalMotorista()">+ Novo motorista</button>
+      </div>
+      <div class="card">
+        <table>
+          <thead><tr><th>Nome</th><th>CNH</th><th>Cartão</th><th>Veículo</th><th>Status</th><th></th></tr></thead>
+          <tbody id="tabela-motoristas"><tr><td colspan="6" class="empty">Carregando...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- VEÍCULOS -->
+    <div class="page" id="page-veiculos">
+      <div class="page-header">
+        <div><h2>Veículos</h2><p>Frota disponível para vínculo com motoristas</p></div>
+        <button class="btn btn-teal" onclick="abrirModalVeiculo()">+ Novo veículo</button>
+      </div>
+      <div class="card">
+        <table>
+          <thead><tr><th>Placa</th><th>Modelo</th><th>Tipo</th><th>Status</th><th></th></tr></thead>
+          <tbody id="tabela-veiculos"><tr><td colspan="5" class="empty">Carregando...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- APONTAMENTOS -->
+    <div class="page" id="page-apontamentos">
+      <div class="page-header">
+        <div><h2>Apontamentos</h2><p>Últimos registros enviados pelo app do motorista</p></div>
+        <button class="btn btn-ghost" onclick="carregarApontamentos()">↻ Atualizar</button>
+      </div>
+      <div class="card">
+        <table>
+          <thead><tr><th>Data/Hora</th><th>Motorista</th><th>Veículo</th><th>Macro</th><th>Tipo</th><th>Obs.</th></tr></thead>
+          <tbody id="tabela-apontamentos"><tr><td colspan="6" class="empty">Carregando...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- MODAL MOTORISTA -->
+<div class="overlay" id="overlay-motorista">
+  <div class="modal">
+    <h3 id="titulo-motorista">Novo motorista</h3>
+    <input type="hidden" id="mot-id">
+    <div class="form-grid">
+      <div><label>Nome completo</label><input id="mot-nome" placeholder="Ex: João da Silva"></div>
+      <div><label>CPF (senha de acesso ao app)</label><input id="mot-cpf" placeholder="000.000.000-00"></div>
+      <div><label>CNH</label><input id="mot-cnh" placeholder="Nº da CNH"></div>
+      <div><label>Categoria CNH</label><input id="mot-catcnh" placeholder="Ex: E"></div>
+      <div><label>Validade CNH</label><input id="mot-valcnh" type="date"></div>
+      <div><label>Cartão/Crachá (opcional)</label><input id="mot-cartao" placeholder="Nº do cartão físico"></div>
+      <div><label>Veículo vinculado</label><select id="mot-veiculo"><option value="">— sem vínculo —</option></select></div>
+      <div><label>Status</label><select id="mot-status"><option>Ativo</option><option>Inativo</option></select></div>
+    </div>
+    <div class="acoes">
+      <button class="btn btn-ghost" onclick="fecharModal('overlay-motorista')">Cancelar</button>
+      <button class="btn btn-teal" onclick="salvarMotorista()">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL VEÍCULO -->
+<div class="overlay" id="overlay-veiculo">
+  <div class="modal">
+    <h3 id="titulo-veiculo">Novo veículo</h3>
+    <input type="hidden" id="vei-id">
+    <div class="form-grid">
+      <div><label>Placa</label><input id="vei-placa" placeholder="AAA-0A00"></div>
+      <div><label>Modelo</label><input id="vei-modelo" placeholder="Ex: Scania R450"></div>
+      <div><label>Tipo</label><input id="vei-tipo" placeholder="Ex: Carreta boiadeira"></div>
+      <div><label>Status</label><select id="vei-status"><option>Ativo</option><option>Inativo</option></select></div>
+    </div>
+    <div class="acoes">
+      <button class="btn btn-ghost" onclick="fecharModal('overlay-veiculo')">Cancelar</button>
+      <button class="btn btn-teal" onclick="salvarVeiculo()">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ⚠️ Cole aqui a URL do Web App do Apps Script (mesma base usada no App Motorista)
+const API_URL = 'https://script.google.com/macros/s/AKfycbwOM5W_UVMx8QjcXiZ3ga237ckePoi-XgA45rQqzew6nel16V80eI3KMcEs5Xp010NmPQ/exec';
+
+let motoristasCache = [], veiculosCache = [];
+let chartMotoristas, chartPizza;
+
+function toast(msg, erro=false){
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.className = 'toast show' + (erro?' erro':'');
+  setTimeout(()=> t.className='toast', 2500);
+}
+
+async function chamar(action, params={}, method='GET', body=null){
+  try{
+    if(method==='GET'){
+      const qs = new URLSearchParams({action, ...params}).toString();
+      const r = await fetch(`${API_URL}?${qs}`);
+      return await r.json();
+    } else {
+      const r = await fetch(API_URL, {method:'POST', body: JSON.stringify({action, ...body})});
+      return await r.json();
+    }
+  }catch(e){ return {erro:'Falha de conexão com a planilha.'}; }
+}
+
+function irPagina(id){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  document.getElementById('page-'+id).classList.add('active');
+  event.currentTarget.classList.add('active');
+  if(id==='dashboard') carregarDashboard();
+  if(id==='motoristas') carregarMotoristas();
+  if(id==='veiculos') carregarVeiculos();
+  if(id==='apontamentos') carregarApontamentos();
+}
+
+function fmtMin(min){
+  const h = Math.floor(min/60), m = Math.round(min%60);
+  return `${h}h${m.toString().padStart(2,'0')}`;
+}
+
+// ---------- DASHBOARD ----------
+async function carregarDashboard(){
+  const d = await chamar('dashboard');
+  if(d.erro){ toast(d.erro, true); return; }
+  document.getElementById('kpi-movimento').textContent = fmtMin(d.totais.movimentoMin);
+  document.getElementById('kpi-parado').textContent = fmtMin(d.totais.paradoMin);
+  document.getElementById('kpi-descanso').textContent = fmtMin(d.totais.descansoMin);
+  document.getElementById('kpi-motoristas').textContent = d.totais.qtdMotoristas;
+  document.getElementById('kpi-apontamentos-sub').textContent = `${d.totais.qtdApontamentos} apontamentos no período`;
+
+  const tbody = document.getElementById('tabela-ranking');
+  tbody.innerHTML = d.porMotorista.length ? d.porMotorista.map(m => `
+    <tr>
+      <td>${m.nome}</td>
+      <td>${fmtMin(m.movimentoMin)}</td>
+      <td>${fmtMin(m.paradoMin)}</td>
+      <td>${fmtMin(m.descansoMin)}</td>
+      <td>${m.ultimoEvento ? m.ultimoEvento.macroNome + ' — ' + new Date(m.ultimoEvento.dataHora).toLocaleString('pt-BR') : '—'}</td>
+    </tr>`).join('') : '<tr><td colspan="5" class="empty">Nenhum apontamento no período.</td></tr>';
+
+  const nomes = d.porMotorista.map(m=>m.nome);
+  if(chartMotoristas) chartMotoristas.destroy();
+  chartMotoristas = new Chart(document.getElementById('chartMotoristas'), {
+    type:'bar',
+    data:{ labels:nomes, datasets:[
+      {label:'Movimento', data:d.porMotorista.map(m=>+(m.movimentoMin/60).toFixed(1)), backgroundColor:'#39FF7E'},
+      {label:'Parado', data:d.porMotorista.map(m=>+(m.paradoMin/60).toFixed(1)), backgroundColor:'#FFD166'},
+      {label:'Descanso', data:d.porMotorista.map(m=>+(m.descansoMin/60).toFixed(1)), backgroundColor:'#00E5C8'}
+    ]},
+    options:{ responsive:true, scales:{ x:{stacked:true, ticks:{color:'#8B93A7'}, grid:{color:'#1C2848'}}, y:{stacked:true, ticks:{color:'#8B93A7'}, grid:{color:'#1C2848'}, title:{display:true, text:'Horas', color:'#8B93A7'}}}, plugins:{legend:{labels:{color:'#E9EDF5'}}} }
+  });
+
+  if(chartPizza) chartPizza.destroy();
+  chartPizza = new Chart(document.getElementById('chartPizza'), {
+    type:'doughnut',
+    data:{ labels:['Movimento','Parado','Descanso'], datasets:[{ data:[d.totais.movimentoMin, d.totais.paradoMin, d.totais.descansoMin], backgroundColor:['#39FF7E','#FFD166','#00E5C8'], borderWidth:0 }] },
+    options:{ responsive:true, plugins:{legend:{position:'bottom', labels:{color:'#E9EDF5'}}} }
+  });
+}
+
+// ---------- MOTORISTAS ----------
+async function carregarMotoristas(){
+  motoristasCache = await chamar('listarMotoristas');
+  const tbody = document.getElementById('tabela-motoristas');
+  tbody.innerHTML = motoristasCache.length ? motoristasCache.map(m => `
+    <tr>
+      <td>${m.nome}</td><td>${m.cnh || '—'}</td><td>${m.cartao || '—'}</td><td>${m.veiculo || '—'}</td>
+      <td><span class="tag ${m.status==='Ativo'?'ativo':'inativo'}">${m.status}</span></td>
+      <td><button class="btn btn-ghost btn-sm" onclick='editarMotorista(${JSON.stringify(m)})'>Editar</button>
+      <button class="btn btn-danger btn-sm" onclick="excluirMotorista('${m.id}')">Excluir</button></td>
+    </tr>`).join('') : '<tr><td colspan="6" class="empty">Nenhum motorista cadastrado.</td></tr>';
+}
+
+async function popularSelectVeiculos(){
+  if(!veiculosCache.length) veiculosCache = await chamar('listarVeiculos');
+  const sel = document.getElementById('mot-veiculo');
+  sel.innerHTML = '<option value="">— sem vínculo —</option>' + veiculosCache.map(v=>`<option value="${v.placa}">${v.placa} — ${v.modelo}</option>`).join('');
+}
+
+async function abrirModalMotorista(){
+  document.getElementById('titulo-motorista').textContent = 'Novo motorista';
+  ['mot-id','mot-nome','mot-cpf','mot-cnh','mot-catcnh','mot-valcnh','mot-cartao'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('mot-status').value = 'Ativo';
+  await popularSelectVeiculos();
+  document.getElementById('overlay-motorista').classList.add('show');
+}
+
+async function editarMotorista(m){
+  document.getElementById('titulo-motorista').textContent = 'Editar motorista';
+  document.getElementById('mot-id').value = m.id;
+  document.getElementById('mot-nome').value = m.nome;
+  document.getElementById('mot-cpf').value = m.cpf;
+  document.getElementById('mot-cnh').value = m.cnh;
+  document.getElementById('mot-catcnh').value = m.categoriaCnh;
+  document.getElementById('mot-valcnh').value = m.validadeCnh ? m.validadeCnh.split('T')[0] : '';
+  document.getElementById('mot-cartao').value = m.cartao;
+  document.getElementById('mot-status').value = m.status;
+  await popularSelectVeiculos();
+  document.getElementById('mot-veiculo').value = m.veiculo || '';
+  document.getElementById('overlay-motorista').classList.add('show');
+}
+
+async function salvarMotorista(){
+  const id = document.getElementById('mot-id').value;
+  const dados = {
+    nome: document.getElementById('mot-nome').value,
+    cpf: document.getElementById('mot-cpf').value,
+    cnh: document.getElementById('mot-cnh').value,
+    categoriaCnh: document.getElementById('mot-catcnh').value,
+    validadeCnh: document.getElementById('mot-valcnh').value,
+    cartao: document.getElementById('mot-cartao').value,
+    veiculo: document.getElementById('mot-veiculo').value,
+    status: document.getElementById('mot-status').value
+  };
+  if(!dados.nome || !dados.cartao){ toast('Preencha nome e cartão.', true); return; }
+  const res = id ? await chamar('editarMotorista', {}, 'POST', {id, ...dados}) : await chamar('criarMotorista', {}, 'POST', dados);
+  if(res.erro){ toast(res.erro, true); return; }
+  toast('Motorista salvo com sucesso.');
+  fecharModal('overlay-motorista');
+  carregarMotoristas();
+}
+
+async function excluirMotorista(id){
+  if(!confirm('Excluir este motorista?')) return;
+  const res = await chamar('excluirMotorista', {}, 'POST', {id});
+  if(res.erro){ toast(res.erro, true); return; }
+  toast('Motorista excluído.');
+  carregarMotoristas();
+}
+
+// ---------- VEÍCULOS ----------
+async function carregarVeiculos(){
+  veiculosCache = await chamar('listarVeiculos');
+  const tbody = document.getElementById('tabela-veiculos');
+  tbody.innerHTML = veiculosCache.length ? veiculosCache.map(v => `
+    <tr>
+      <td>${v.placa}</td><td>${v.modelo || '—'}</td><td>${v.tipo || '—'}</td>
+      <td><span class="tag ${v.status==='Ativo'?'ativo':'inativo'}">${v.status}</span></td>
+      <td><button class="btn btn-ghost btn-sm" onclick='editarVeiculo(${JSON.stringify(v)})'>Editar</button>
+      <button class="btn btn-danger btn-sm" onclick="excluirVeiculo('${v.id}')">Excluir</button></td>
+    </tr>`).join('') : '<tr><td colspan="5" class="empty">Nenhum veículo cadastrado.</td></tr>';
+}
+
+function abrirModalVeiculo(){
+  document.getElementById('titulo-veiculo').textContent = 'Novo veículo';
+  ['vei-id','vei-placa','vei-modelo','vei-tipo'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('vei-status').value = 'Ativo';
+  document.getElementById('overlay-veiculo').classList.add('show');
+}
+
+function editarVeiculo(v){
+  document.getElementById('titulo-veiculo').textContent = 'Editar veículo';
+  document.getElementById('vei-id').value = v.id;
+  document.getElementById('vei-placa').value = v.placa;
+  document.getElementById('vei-modelo').value = v.modelo;
+  document.getElementById('vei-tipo').value = v.tipo;
+  document.getElementById('vei-status').value = v.status;
+  document.getElementById('overlay-veiculo').classList.add('show');
+}
+
+async function salvarVeiculo(){
+  const id = document.getElementById('vei-id').value;
+  const dados = {
+    placa: document.getElementById('vei-placa').value,
+    modelo: document.getElementById('vei-modelo').value,
+    tipo: document.getElementById('vei-tipo').value,
+    status: document.getElementById('vei-status').value
+  };
+  if(!dados.placa){ toast('Informe a placa.', true); return; }
+  const res = id ? await chamar('editarVeiculo', {}, 'POST', {id, ...dados}) : await chamar('criarVeiculo', {}, 'POST', dados);
+  if(res.erro){ toast(res.erro, true); return; }
+  toast('Veículo salvo com sucesso.');
+  fecharModal('overlay-veiculo');
+  carregarVeiculos();
+}
+
+async function excluirVeiculo(id){
+  if(!confirm('Excluir este veículo?')) return;
+  const res = await chamar('excluirVeiculo', {}, 'POST', {id});
+  if(res.erro){ toast(res.erro, true); return; }
+  toast('Veículo excluído.');
+  carregarVeiculos();
+}
+
+// ---------- APONTAMENTOS ----------
+async function carregarApontamentos(){
+  const lista = await chamar('listarApontamentos');
+  const tbody = document.getElementById('tabela-apontamentos');
+  tbody.innerHTML = lista.length ? lista.slice(0,100).map(a => `
+    <tr>
+      <td>${new Date(a.dataHora).toLocaleString('pt-BR')}</td>
+      <td>${a.motoristaNome}</td><td>${a.veiculo || '—'}</td>
+      <td>${a.macroId}. ${a.macroNome}</td>
+      <td><span class="tag ${a.tipo==='movimento'?'mov':a.tipo}">${a.tipo}</span></td>
+      <td>${a.observacao || (a.motivoParada||'—')}</td>
+    </tr>`).join('') : '<tr><td colspan="6" class="empty">Nenhum apontamento registrado.</td></tr>';
+}
+
+function fecharModal(id){ document.getElementById(id).classList.remove('show'); }
+
+// inicializa
+carregarDashboard();
+</script>
+</body>
+</html>
